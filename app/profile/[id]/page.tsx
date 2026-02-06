@@ -338,12 +338,12 @@ export default function ProfileDetailPage({
                             </Link>
                           </Button>
                           {profile.role === "player" && (
-                            <Button variant="outline">
+                            <Button variant="outline" onClick={handleSavePlayer}>
                               <Bookmark className={`h-4 w-4 mr-2 ${savedPlayer ? "fill-current" : ""}`} />
                               {savedPlayer ? "Saved" : "Save"}
                             </Button>
                           )}
-                          <Button variant="outline">
+                          <Button variant="outline" onClick={handleFollow}>
                             <Users className={`h-4 w-4 mr-2 ${isFollowing ? "fill-current" : ""}`} />
                             {isFollowing ? "Following" : "Follow"}
                           </Button>
