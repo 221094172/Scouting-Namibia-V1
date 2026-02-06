@@ -167,6 +167,12 @@ export default function UploadPage() {
                 updated_at: serverTimestamp(),
               })
 
+              // Increment video_count for user profile
+              console.log("[v0] Updating user video count...")
+              await updateDoc(doc(db, "profiles", user.uid), {
+                video_count: increment(1),
+              })
+
               console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
               setIsLoading(false)
               router.push("/feed")
