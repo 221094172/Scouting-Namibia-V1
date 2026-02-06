@@ -94,106 +94,103 @@ export default function UploadPage() {
     setError(null)
 
     try {
-      const app = getFirebaseApp()
-      const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage")
-      const { getFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, increment } = await import("firebase/firestore")
-      const storage = getStorage(app)
-      const db = getFirestore(app)
-
       const fileExt = selectedFile.name.split(".").pop()
-      const fileName = `videos/${user.uid}/${Date.now()}.${fileExt}`
-      const storageRef = ref(storage, fileName)
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
       console.log("[v0] Starting upload for file:", selectedFile.name, "Size:", selectedFile.size, "bytes")
 
-      // Use uploadBytesResumable for better control and progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, selectedFile)
+      // Upload to Supabase Storage
+      let uploadStartTime = Date.now()
+      let lastProgressUpdate = 0
 
-      // Wrap uploadTask in a Promise and await it
-      await new Promise<void>((resolve, reject) => {
-        let uploadStartTime = Date.now()
+      const { data, error: uploadError } = await supabase.storage
+        .from("videos")
+        .upload(fileName, selectedFile, {
+          onUploadProgress: (progress) => {
+            const progressPercent = Math.round((progress.loaded / progress.total) * 100)
 
-        uploadTask.on(
-          "state_changed",
-          (snapshot) => {
-            // Track progress
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-            const currentTime = Date.now()
-            const elapsedSeconds = (currentTime - uploadStartTime) / 1000
+            // Only update state once per second to avoid excessive re-renders
+            const now = Date.now()
+            if (now - lastProgressUpdate >= 1000 || progressPercent === 100) {
+              setUploadProgress(progressPercent)
+              lastProgressUpdate = now
 
-            setUploadProgress(Math.round(progress))
-
-            console.log(`[v0] Upload progress: ${Math.round(progress)}% (${(snapshot.bytesTransferred / (1024 * 1024)).toFixed(1)}MB / ${(snapshot.totalBytes / (1024 * 1024)).toFixed(1)}MB) - ${elapsedSeconds.toFixed(1)}s elapsed`)
-          },
-          (error) => {
-            // Handle errors with more detail
-            console.error("[v0] Upload error details:", {
-              code: error.code,
-              message: error.message,
-              customData: error.customData,
-            })
-
-            let errorMessage = "Failed to upload video"
-            if (error.code === "storage/unauthorized") {
-              errorMessage = "Not authorized to upload. Check Firebase Storage rules."
-            } else if (error.code === "storage/retry-limit-exceeded") {
-              errorMessage = "Upload failed after multiple retries. Please try again."
-            } else if (error.code === "storage/canceled") {
-              errorMessage = "Upload was cancelled."
-            } else if (error.message?.includes("CORS")) {
-              errorMessage = "CORS error: Check Firebase Storage configuration. This is likely a backend configuration issue."
+              const elapsedSeconds = (now - uploadStartTime) / 1000
+              const mbTransferred = (progress.loaded / (1024 * 1024)).toFixed(1)
+              const mbTotal = (progress.total / (1024 * 1024)).toFixed(1)
+              console.log(`[v0] Upload progress: ${progressPercent}% (${mbTransferred}MB / ${mbTotal}MB) - ${elapsedSeconds.toFixed(1)}s elapsed`)
             }
-
-            setError(errorMessage)
-            setIsLoading(false)
-            reject(error)
           },
-          async () => {
-            // Handle successful upload
-            const uploadTime = (Date.now() - uploadStartTime) / 1000
-            console.log(`[v0] Upload completed successfully in ${uploadTime.toFixed(1)}s`)
+        })
 
-            try {
-              console.log("[v0] Getting download URL...")
-              const videoUrl = await getDownloadURL(storageRef)
-              console.log("[v0] Download URL obtained:", videoUrl.substring(0, 50) + "...")
+      if (uploadError) {
+        console.error("[v0] Upload error:", uploadError)
+        let errorMessage = "Failed to upload video"
 
-              console.log("[v0] Saving video metadata to Firestore...")
-              await addDoc(collection(db, "videos"), {
-                user_id: user.uid,
-                title: formData.title,
-                description: formData.description,
-                video_url: videoUrl,
-                position: formData.position || null,
-                region: formData.region || null,
-                town: formData.town || null,
-                like_count: 0,
-                comment_count: 0,
-                view_count: 0,
-                created_at: serverTimestamp(),
-                updated_at: serverTimestamp(),
-              })
+        if (uploadError.message.includes("unauthorized")) {
+          errorMessage = "Not authorized to upload. Check Supabase Storage permissions."
+        } else if (uploadError.message.includes("not found")) {
+          errorMessage = "Storage bucket not found. Please check bucket configuration."
+        }
 
-              // Increment video_count for user profile
-              console.log("[v0] Updating user video count...")
-              await updateDoc(doc(db, "profiles", user.uid), {
-                video_count: increment(1),
-              })
+        setError(errorMessage)
+        setIsLoading(false)
+        return
+      }
 
-              console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
-              setIsLoading(false)
-              router.push("/feed")
-              router.refresh()
-              resolve()
-            } catch (error: any) {
-              console.error("[v0] Metadata error:", error)
-              setError("Video uploaded but failed to save metadata. Please try again.")
-              setIsLoading(false)
-              reject(error)
-            }
-          }
-        )
-      })
+      const uploadTime = (Date.now() - uploadStartTime) / 1000
+      console.log(`[v0] Upload completed successfully in ${uploadTime.toFixed(1)}s`)
+
+      try {
+        console.log("[v0] Getting download URL...")
+        const { data: urlData } = supabase.storage.from("videos").getPublicUrl(fileName)
+        const videoUrl = urlData?.publicUrl
+        console.log("[v0] Download URL obtained:", videoUrl.substring(0, 50) + "...")
+
+        console.log("[v0] Saving video metadata to Supabase...")
+        const { error: insertError } = await supabase.from("videos").insert({
+          user_id: user.id,
+          title: formData.title,
+          description: formData.description,
+          video_url: videoUrl,
+          position: formData.position || null,
+          region: formData.region || null,
+          town: formData.town || null,
+          like_count: 0,
+          comment_count: 0,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (insertError) {
+          throw insertError
+        }
+
+        // Increment video_count for user profile
+        console.log("[v0] Updating user video count...")
+        const { data: playerProfile } = await supabase
+          .from("player_profiles")
+          .select("video_count")
+          .eq("id", user.id)
+          .single()
+
+        if (playerProfile) {
+          await supabase
+            .from("player_profiles")
+            .update({ video_count: (playerProfile.video_count || 0) + 1 })
+            .eq("id", user.id)
+        }
+
+        console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
+        setIsLoading(false)
+        router.push("/feed")
+        router.refresh()
+      } catch (error: any) {
+        console.error("[v0] Metadata error:", error)
+        setError("Video uploaded but failed to save metadata. Please try again.")
+        setIsLoading(false)
+      }
     } catch (error: any) {
       console.error("[v0] Upload error:", error)
       setError(error.message || "Failed to upload video")
