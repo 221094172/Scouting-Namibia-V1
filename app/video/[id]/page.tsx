@@ -313,8 +313,8 @@ export default function VideoDetailPage() {
         },
       }
 
-      setComments([newCommentObj, ...comments])
-      setVideo({ ...video, comment_count: video.comment_count + 1 })
+      setComments((prev) => [newCommentObj, ...prev])
+      setVideo((prev) => ({ ...prev, comment_count: prev.comment_count + 1 }))
       setNewComment("")
     } catch (err) {
       console.error("[v0] Comment error:", err)
