@@ -93,8 +93,22 @@ export default function ResetPasswordPage() {
                 minLength={6}
               />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+            {success && (
+              <Alert className="border-green-500 bg-green-50 text-green-900">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Password updated successfully! Redirecting to login...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading || success}>
               {isLoading ? "Updating..." : "Update Password"}
             </Button>
           </form>
