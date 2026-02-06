@@ -43,45 +43,44 @@ export default function FeedPage() {
 
   const loadData = async (userId: string) => {
     try {
-      const app = getFirebaseApp()
-      const { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } = await import("firebase/firestore")
-      const db = getFirestore(app)
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single()
 
-      // Add timeout to handle offline scenarios
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Firebase operation timed out. Please check your internet connection.")), 10000)
-      )
+      if (profileError) {
+        console.warn("Profile fetch error:", profileError)
+      } else {
+        setUserProfile(profileData)
+      }
 
-      try {
-        const profileDoc = await Promise.race([getDoc(doc(db, "profiles", userId)), timeoutPromise])
-        if (profileDoc.exists()) {
-          setUserProfile({ id: profileDoc.id, ...profileDoc.data() })
-        }
-
-        const videosQuery = query(collection(db, "videos"), orderBy("created_at", "desc"), limit(20))
-        const videosSnapshot = await Promise.race([getDocs(videosQuery), timeoutPromise])
-
-        const videosData = await Promise.all(
-          videosSnapshot.docs.map(async (videoDoc) => {
-            const videoData: any = { id: videoDoc.id, ...videoDoc.data() }
-
-            // Fetch profile for each video
-            const profileDocRef = await getDoc(doc(db, "profiles", videoData.user_id))
-            if (profileDocRef.exists()) {
-              videoData.profiles = { id: profileDocRef.id, ...profileDocRef.data() }
-            }
-
-            return videoData
-          }),
+      // Fetch videos with related profile data
+      const { data: videosData, error: videosError } = await supabase
+        .from("videos")
+        .select(
+          `*,
+          profiles (
+            id,
+            display_name,
+            profile_image_url,
+            bio,
+            region,
+            town
+          )`
         )
+        .order("created_at", { ascending: false })
+        .limit(20)
 
-        setVideos(videosData)
-      } catch (timeoutError) {
-        console.warn("Network timeout - data may be loaded from offline cache", timeoutError)
+      if (videosError) {
+        console.error("[v0] Error loading videos:", videosError)
+        setVideos([])
+      } else {
+        setVideos(videosData || [])
       }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
-      // Show empty state instead of crashing
       setVideos([])
     } finally {
       setIsLoading(false)
