@@ -138,6 +138,9 @@ function RegisterForm() {
       // Send verification email
       await sendEmailVerification(user)
 
+      // Sign out user until they verify their email
+      await auth.signOut()
+
       console.log("[v0] Registration successful, email verification sent")
       router.push("/auth/sign-up-success")
     } catch (error: any) {
