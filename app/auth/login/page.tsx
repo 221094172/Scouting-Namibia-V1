@@ -104,7 +104,7 @@ export default function LoginPage() {
       const { getAuth, sendPasswordResetEmail } = await import("firebase/auth")
       const auth = getAuth(app)
       await sendPasswordResetEmail(auth, email)
-      alert("Password reset email sent! Please check your inbox.")
+      setResendSuccess(true)
     } catch (error: any) {
       console.error("[v0] Password reset error:", error)
       setError(error.message || "Failed to send reset email")
