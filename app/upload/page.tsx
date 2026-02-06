@@ -95,7 +95,7 @@ export default function UploadPage() {
 
     try {
       const fileExt = selectedFile.name.split(".").pop()
-      const fileName = `${user.uid}/${Date.now()}.${fileExt}`
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
       console.log("[v0] Starting upload for file:", selectedFile.name, "Size:", selectedFile.size, "bytes")
 
