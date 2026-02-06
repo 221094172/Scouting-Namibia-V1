@@ -159,7 +159,7 @@ export default function LoginPage() {
               <Alert className="border-green-500 bg-green-50 text-green-900">
                 <Mail className="h-4 w-4" />
                 <AlertDescription className="text-sm">
-                  Verification email resent! Please check your inbox and spam folder.
+                  Email sent! Please check your inbox and spam folder for the verification or password reset link.
                 </AlertDescription>
               </Alert>
             )}
