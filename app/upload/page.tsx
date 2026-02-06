@@ -209,7 +209,13 @@ export default function UploadPage() {
                     <div className="space-y-2">
                       <Video className="mx-auto h-12 w-12 text-primary" />
                       <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setSelectedFile(null)}>
+                      <p className="text-xs text-muted-foreground">
+                        {(selectedFile.size / (1024 * 1024)).toFixed(1)}MB
+                      </p>
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        setSelectedFile(null)
+                        setUploadProgress(0)
+                      }}>
                         Change Video
                       </Button>
                     </div>
@@ -217,7 +223,8 @@ export default function UploadPage() {
                     <>
                       <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-2 text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                      <p className="text-xs text-muted-foreground">MP4, MOV (max 100MB)</p>
+                      <p className="text-xs text-muted-foreground">MP4, MOV, WebM (max 100MB)</p>
+                      <p className="text-xs text-muted-foreground mt-1">Tip: Compress videos larger than 50MB for faster uploads</p>
                       <Input type="file" accept="video/*" onChange={handleFileChange} className="mt-4" />
                     </>
                   )}
