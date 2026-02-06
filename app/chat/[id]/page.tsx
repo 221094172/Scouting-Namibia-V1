@@ -140,16 +140,16 @@ export default function ChatPage() {
       setMessages(messagesData)
 
       // Mark messages as read
-      const { updateDoc, batch } = await import("firebase/firestore")
-      const writeBatch = batch()
-      
+      const { writeBatch } = await import("firebase/firestore")
+      const wb = writeBatch(db)
+
       messagesData.forEach((msg) => {
         if (msg.sender_id !== userId && !msg.read) {
-          writeBatch.update(doc(db, "messages", msg.id), { read: true })
+          wb.update(doc(db, "messages", msg.id), { read: true })
         }
       })
-      
-      await writeBatch.commit()
+
+      await wb.commit()
 
       // Update conversation last view
       await updateDoc(doc(db, "chat_conversations", conversationId), {
