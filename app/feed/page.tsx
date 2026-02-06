@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 import FeedClient from "@/components/feed-client"
 
 export default function FeedPage() {
