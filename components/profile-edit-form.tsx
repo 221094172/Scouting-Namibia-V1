@@ -81,26 +81,26 @@ export default function ProfileEditForm({ profile, roleData }: { profile: any; r
 
       if (profile.role === "player") {
         await updateDoc(doc(db, "player_profiles", profile.id), {
-          age: formData.age ? Number.parseInt(formData.age) : null,
+          age: formData.age ? parseInt(formData.age, 10) : null,
           position: formData.position || null,
           preferred_foot: formData.preferred_foot || null,
-          height_cm: formData.height_cm ? Number.parseInt(formData.height_cm) : null,
-          weight_kg: formData.weight_kg ? Number.parseInt(formData.weight_kg) : null,
-          experience_years: formData.experience_years ? Number.parseInt(formData.experience_years) : null,
+          height_cm: formData.height_cm ? parseInt(formData.height_cm, 10) : null,
+          weight_kg: formData.weight_kg ? parseInt(formData.weight_kg, 10) : null,
+          experience_years: formData.experience_years ? parseInt(formData.experience_years, 10) : null,
           current_club: formData.current_club || null,
           achievements: formData.achievements || null,
         })
       } else if (profile.role === "coach") {
         await updateDoc(doc(db, "coach_profiles", profile.id), {
           coaching_license: formData.coaching_license || null,
-          years_experience: formData.years_experience ? Number.parseInt(formData.years_experience) : null,
+          years_experience: formData.years_experience ? parseInt(formData.years_experience, 10) : null,
           specialization: formData.specialization || null,
           current_club: formData.current_club || null,
         })
       } else if (profile.role === "club") {
         await updateDoc(doc(db, "club_profiles", profile.id), {
           club_name: formData.club_name,
-          founded_year: formData.founded_year ? Number.parseInt(formData.founded_year) : null,
+          founded_year: formData.founded_year ? parseInt(formData.founded_year, 10) : null,
           league: formData.league || null,
           stadium: formData.stadium || null,
           contact_person: formData.contact_person || null,
