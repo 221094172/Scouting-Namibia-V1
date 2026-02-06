@@ -44,8 +44,11 @@ export default function ResetPasswordPage() {
       const auth = getAuth(app)
       await confirmPasswordReset(auth, oobCode, password)
 
-      alert("Password updated successfully!")
-      router.push("/auth/login")
+      setSuccess(true)
+      // Redirect after showing success message
+      setTimeout(() => {
+        router.push("/auth/login")
+      }, 2000)
     } catch (error: any) {
       console.error("[v0] Password update error:", error)
       setError(error.message || "Failed to update password")
