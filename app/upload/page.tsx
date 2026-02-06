@@ -295,8 +295,20 @@ export default function UploadPage() {
 
               {error && <p className="text-sm text-red-500">{error}</p>}
 
+              {isLoading && uploadProgress > 0 && (
+                <div className="space-y-2">
+                  <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-primary h-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">{uploadProgress}% uploaded</p>
+                </div>
+              )}
+
               <Button type="submit" className="w-full" size="lg" disabled={!selectedFile || isLoading}>
-                {isLoading ? "Uploading..." : "Post Video"}
+                {isLoading ? `Uploading... ${uploadProgress > 0 ? `${uploadProgress}%` : ''}` : "Post Video"}
               </Button>
             </form>
           </CardContent>
