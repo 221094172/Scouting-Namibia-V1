@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Trophy, Mail } from "lucide-react"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
