@@ -126,7 +126,23 @@ export default function UploadPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+        setError(`File size (${sizeMB}MB) exceeds 100MB limit. Please compress your video.`)
+        return
+      }
+
+      // Validate file type
+      if (!file.type.startsWith("video/")) {
+        setError("Please select a valid video file")
+        return
+      }
+
+      setError(null)
+      setSelectedFile(file)
     }
   }
 
