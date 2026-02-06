@@ -52,30 +52,23 @@ export default function UploadPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
+    let unsubscribe: (() => void) | undefined
 
-      if (!session?.user) {
-        router.push("/auth/login")
-      } else {
-        setUser(session.user)
-      }
+    const initAuth = async () => {
+      const app = getFirebaseApp()
+      const { getAuth, onAuthStateChanged } = await import("firebase/auth")
+      const auth = getAuth(app)
+      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        if (!currentUser) {
+          router.push("/auth/login")
+        } else {
+          setUser(currentUser)
+        }
+      })
     }
 
-    checkAuth()
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (!session?.user) {
-        router.push("/auth/login")
-      } else {
-        setUser(session.user)
-      }
-    })
-
-    return () => {
-      subscription?.unsubscribe()
-    }
+    initAuth()
+    return () => { if (unsubscribe) unsubscribe() }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
