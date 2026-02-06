@@ -276,42 +276,44 @@ function VideoPost({ video, userId }: { video: any; userId: string }) {
 
 const handleLike = async () => {
   try {
-  const app = getFirebaseApp()
-  const { getFirestore, doc, updateDoc, increment, addDoc, collection, deleteDoc, query, where, getDocs } = await import("firebase/firestore")
-  const db = getFirestore(app)
-      if (liked) {
-        const likesQuery = query(
-          collection(db, "video_likes"),
-          where("video_id", "==", video.id),
-          where("user_id", "==", userId),
-        )
-        const snapshot = await getDocs(likesQuery)
-        snapshot.forEach(async (docSnapshot) => {
-          await deleteDoc(docSnapshot.ref)
-        })
+    const app = getFirebaseApp()
+    const { getFirestore, doc, updateDoc, increment, addDoc, collection, deleteDoc, query, where, getDocs } = await import("firebase/firestore")
+    const db = getFirestore(app)
 
-        await updateDoc(doc(db, "videos", video.id), {
-          like_count: increment(-1),
-        })
-        setLiked(false)
-        setLikeCount(likeCount - 1)
-      } else {
-        await addDoc(collection(db, "video_likes"), {
-          video_id: video.id,
-          user_id: userId,
-          created_at: new Date(),
-        })
+    if (liked) {
+      const likesQuery = query(
+        collection(db, "video_likes"),
+        where("video_id", "==", video.id),
+        where("user_id", "==", userId),
+      )
+      const snapshot = await getDocs(likesQuery)
 
-        await updateDoc(doc(db, "videos", video.id), {
-          like_count: increment(1),
-        })
-        setLiked(true)
-        setLikeCount(likeCount + 1)
-      }
-    } catch (error) {
-      console.error("[v0] Error toggling like:", error)
+      // Wait for all deletions to complete before updating like count
+      const deletePromises = snapshot.docs.map((docSnapshot) => deleteDoc(docSnapshot.ref))
+      await Promise.all(deletePromises)
+
+      await updateDoc(doc(db, "videos", video.id), {
+        like_count: increment(-1),
+      })
+      setLiked(false)
+      setLikeCount((prev) => prev - 1) // Use functional update to avoid stale closure
+    } else {
+      await addDoc(collection(db, "video_likes"), {
+        video_id: video.id,
+        user_id: userId,
+        created_at: new Date(),
+      })
+
+      await updateDoc(doc(db, "videos", video.id), {
+        like_count: increment(1),
+      })
+      setLiked(true)
+      setLikeCount((prev) => prev + 1) // Use functional update to avoid stale closure
     }
+  } catch (error) {
+    console.error("[v0] Error toggling like:", error)
   }
+}
 
   const profile = video.profiles
 
