@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Upload, Video } from "lucide-react"
 import Link from "next/link"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 const NAMIBIA_REGIONS = [
   "Erongo",
