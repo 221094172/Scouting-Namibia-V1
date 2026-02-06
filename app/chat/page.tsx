@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -11,6 +11,8 @@ import { getFirebaseApp } from "@/lib/firebase/config"
 
 export default function ChatPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const userParam = searchParams.get("user") // Get user param to start conversation
   const [user, setUser] = useState<any>(null)
   const [conversations, setConversations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
