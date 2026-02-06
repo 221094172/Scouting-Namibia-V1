@@ -29,21 +29,19 @@ export default function LoginPage() {
 
     try {
       console.log("[v0] Attempting login for:", email)
-      
-      // Initialize Firebase App first, then dynamically import auth
-      const app = getFirebaseApp()
-      const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth")
-      const auth = getAuth(app)
 
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (!user.emailVerified) {
-        // Sign out unverified user to avoid leaving them in a partial logged-in state
-        await auth.signOut()
-        setError(
-          "Please verify your email address before logging in. Check your inbox for the verification link, or click 'Resend confirmation' below.",
-        )
+      if (error) {
+        throw error
+      }
+
+      const user = data.user
+      if (!user) {
+        setError("Login failed. Please try again.")
         return
       }
 
@@ -52,10 +50,12 @@ export default function LoginPage() {
       router.refresh()
     } catch (error: any) {
       console.error("[v0] Login error:", error)
-      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+      if (error.message?.includes("Invalid login credentials")) {
         setError("Invalid email or password. Please try again.")
-      } else if (error.code === "auth/user-not-found") {
-        setError("No account found with this email. Please sign up first.")
+      } else if (error.message?.includes("Email not confirmed")) {
+        setError(
+          "Please verify your email address before logging in. Check your inbox for the verification link, or click 'Resend confirmation' below.",
+        )
       } else {
         setError(error.message || "An error occurred during login")
       }
