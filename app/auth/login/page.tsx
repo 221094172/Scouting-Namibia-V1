@@ -65,8 +65,8 @@ export default function LoginPage() {
   }
 
   const handleResendConfirmation = async () => {
-    if (!email || !password) {
-      setError("Please enter your email and password first")
+    if (!email) {
+      setError("Please enter your email first")
       return
     }
 
@@ -75,11 +75,15 @@ export default function LoginPage() {
     setResendSuccess(false)
 
     try {
-      const app = getFirebaseApp()
-      const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth")
-      const auth = getAuth(app)
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      await sendEmailVerification(userCredential.user)
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+      })
+
+      if (error) {
+        throw error
+      }
+
       setResendSuccess(true)
     } catch (error: any) {
       console.error("[v0] Resend confirmation error:", error)
