@@ -89,7 +89,7 @@ export default function UploadPage() {
     try {
       const app = getFirebaseApp()
       const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage")
-      const { getFirestore, collection, addDoc, serverTimestamp } = await import("firebase/firestore")
+      const { getFirestore, collection, addDoc, serverTimestamp, doc, updateDoc, increment } = await import("firebase/firestore")
       const storage = getStorage(app)
       const db = getFirestore(app)
 
