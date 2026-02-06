@@ -97,7 +97,7 @@ function RegisterForm() {
       if (role === "player") {
         await setDoc(doc(db, "player_profiles", user.uid), {
           id: user.uid,
-          age: Number.parseInt(formData.age) || null,
+          age: formData.age ? parseInt(formData.age, 10) : null,
           gender: formData.gender || null,
           position: formData.position || null,
           height: null,
