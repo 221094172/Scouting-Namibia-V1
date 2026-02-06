@@ -201,7 +201,7 @@ export default function VideoDetailPage() {
         })
 
         setIsLiked(false)
-        setVideo({ ...video, like_count: video.like_count - 1 })
+        setVideo((prev) => ({ ...prev, like_count: prev.like_count - 1 }))
       } else {
         // Like: add like document
         await addDoc(collection(db, "video_likes"), {
@@ -216,7 +216,7 @@ export default function VideoDetailPage() {
         })
 
         setIsLiked(true)
-        setVideo({ ...video, like_count: video.like_count + 1 })
+        setVideo((prev) => ({ ...prev, like_count: prev.like_count + 1 }))
       }
     } catch (err) {
       console.error("[v0] Like error:", err)
