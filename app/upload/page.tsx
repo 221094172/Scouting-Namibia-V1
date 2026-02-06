@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Upload, Video } from "lucide-react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase/client"
-import { getFirebaseApp } from "@/lib/firebase/config"
 
 const NAMIBIA_REGIONS = [
   "Erongo",
