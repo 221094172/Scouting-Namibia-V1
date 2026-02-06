@@ -240,14 +240,17 @@ export default function VideoDetailPage() {
           where("following_id", "==", video.user_id)
         )
         const followSnapshot = await getDocs(followQuery)
-        
+
         for (const followDoc of followSnapshot.docs) {
           await deleteDoc(followDoc.ref)
         }
 
-        // Decrement follower count
+        // Decrement follower count for creator and following count for current user
         await updateDoc(doc(db, "profiles", video.user_id), {
           followers_count: increment(-1),
+        })
+        await updateDoc(doc(db, "profiles", user.uid), {
+          following_count: increment(-1),
         })
 
         setIsFollowing(false)
@@ -259,9 +262,12 @@ export default function VideoDetailPage() {
           created_at: new Date(),
         })
 
-        // Increment follower count
+        // Increment follower count for creator and following count for current user
         await updateDoc(doc(db, "profiles", video.user_id), {
           followers_count: increment(1),
+        })
+        await updateDoc(doc(db, "profiles", user.uid), {
+          following_count: increment(1),
         })
 
         setIsFollowing(true)
