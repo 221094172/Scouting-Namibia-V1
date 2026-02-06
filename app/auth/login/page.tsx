@@ -104,10 +104,14 @@ export default function LoginPage() {
     setResendSuccess(false)
 
     try {
-      const app = getFirebaseApp()
-      const { getAuth, sendPasswordResetEmail } = await import("firebase/auth")
-      const auth = getAuth(app)
-      await sendPasswordResetEmail(auth, email)
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+
+      if (error) {
+        throw error
+      }
+
       setResendSuccess(true)
     } catch (error: any) {
       console.error("[v0] Password reset error:", error)
