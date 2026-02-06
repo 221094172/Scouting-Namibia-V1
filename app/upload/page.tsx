@@ -83,43 +83,73 @@ export default function UploadPage() {
     }
 
     setIsLoading(true)
+    setUploadProgress(0)
     setError(null)
 
     try {
       const app = getFirebaseApp()
-      const { getStorage, ref, uploadBytes, getDownloadURL } = await import("firebase/storage")
+      const { getStorage, ref, uploadBytesResumable, getDownloadURL } = await import("firebase/storage")
       const { getFirestore, collection, addDoc, serverTimestamp } = await import("firebase/firestore")
       const storage = getStorage(app)
       const db = getFirestore(app)
-      
+
       const fileExt = selectedFile.name.split(".").pop()
       const fileName = `videos/${user.uid}/${Date.now()}.${fileExt}`
       const storageRef = ref(storage, fileName)
 
-      await uploadBytes(storageRef, selectedFile)
-      const videoUrl = await getDownloadURL(storageRef)
+      // Use uploadBytesResumable for better control and progress tracking
+      const uploadTask = uploadBytesResumable(storageRef, selectedFile)
 
-      await addDoc(collection(db, "videos"), {
-        user_id: user.uid,
-        title: formData.title,
-        description: formData.description,
-        video_url: videoUrl,
-        position: formData.position || null,
-        region: formData.region || null,
-        town: formData.town || null,
-        like_count: 0,
-        comment_count: 0,
-        view_count: 0,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
+      return new Promise((resolve, reject) => {
+        uploadTask.on(
+          "state_changed",
+          (snapshot) => {
+            // Track progress
+            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+            setUploadProgress(Math.round(progress))
+          },
+          (error) => {
+            // Handle errors
+            console.error("[v0] Upload error:", error)
+            setError(error.message || "Failed to upload video")
+            setIsLoading(false)
+            reject(error)
+          },
+          async () => {
+            // Handle successful upload
+            try {
+              const videoUrl = await getDownloadURL(storageRef)
+
+              await addDoc(collection(db, "videos"), {
+                user_id: user.uid,
+                title: formData.title,
+                description: formData.description,
+                video_url: videoUrl,
+                position: formData.position || null,
+                region: formData.region || null,
+                town: formData.town || null,
+                like_count: 0,
+                comment_count: 0,
+                view_count: 0,
+                created_at: serverTimestamp(),
+                updated_at: serverTimestamp(),
+              })
+
+              router.push("/feed")
+              router.refresh()
+              resolve(null)
+            } catch (error: any) {
+              console.error("[v0] Metadata error:", error)
+              setError(error.message || "Failed to save video metadata")
+              setIsLoading(false)
+              reject(error)
+            }
+          }
+        )
       })
-
-      router.push("/feed")
-      router.refresh()
     } catch (error: any) {
       console.error("[v0] Upload error:", error)
       setError(error.message || "Failed to upload video")
-    } finally {
       setIsLoading(false)
     }
   }
