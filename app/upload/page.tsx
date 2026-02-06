@@ -137,7 +137,7 @@ export default function UploadPage() {
 
       try {
         console.log("[v0] Getting download URL...")
-        const { data: urlData } = supabase.storage.from("VIDEO").getPublicUrl(fileName)
+        const { data: urlData } = supabase.storage.from("Video").getPublicUrl(fileName)
         const videoUrl = urlData?.publicUrl
         console.log("[v0] Download URL obtained:", videoUrl.substring(0, 50) + "...")
 
