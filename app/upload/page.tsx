@@ -336,9 +336,18 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && (
+                <div className="space-y-2">
+                  <p className="text-sm text-red-500">{error}</p>
+                  {error.includes("CORS") && (
+                    <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      This is a backend configuration issue. Contact the administrator to configure Firebase Storage CORS settings.
+                    </p>
+                  )}
+                </div>
+              )}
 
-              {isLoading && uploadProgress > 0 && (
+              {isLoading && (
                 <div className="space-y-2">
                   <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
                     <div
@@ -347,6 +356,7 @@ export default function UploadPage() {
                     />
                   </div>
                   <p className="text-xs text-muted-foreground text-center">{uploadProgress}% uploaded</p>
+                  <p className="text-xs text-muted-foreground text-center">Check browser console (F12) for detailed upload progress</p>
                 </div>
               )}
 
