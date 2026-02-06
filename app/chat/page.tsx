@@ -19,7 +19,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
-    
+
     const initAuth = async () => {
       const app = getFirebaseApp()
       const { getAuth, onAuthStateChanged } = await import("firebase/auth")
@@ -29,14 +29,19 @@ export default function ChatPage() {
           router.push("/auth/login")
         } else {
           setUser(currentUser)
-          await loadConversations(currentUser.uid)
+          // If user param is provided, try to start or find conversation with that user
+          if (userParam) {
+            await handleStartConversation(currentUser.uid, userParam)
+          } else {
+            await loadConversations(currentUser.uid)
+          }
         }
       })
     }
-    
+
     initAuth()
     return () => { if (unsubscribe) unsubscribe() }
-  }, [router])
+  }, [router, userParam])
 
   const loadConversations = async (userId: string) => {
     try {
