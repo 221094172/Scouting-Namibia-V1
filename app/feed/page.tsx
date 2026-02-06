@@ -13,25 +13,32 @@ export default function FeedPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined
-    
-    const initAuth = async () => {
-      const app = getFirebaseApp()
-      const { getAuth, onAuthStateChanged } = await import("firebase/auth")
-      const auth = getAuth(app)
-      unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (!currentUser) {
-          router.push("/auth/login")
-        } else {
-          setUser(currentUser)
-          await loadData(currentUser.uid)
-        }
-      })
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+        await loadData(session.user.id)
+      }
     }
-    
-    initAuth()
-    
-    return () => { if (unsubscribe) unsubscribe() }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+        await loadData(session.user.id)
+      }
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [router])
 
   const loadData = async (userId: string) => {
