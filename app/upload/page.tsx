@@ -98,7 +98,7 @@ export default function UploadPage() {
       let lastProgressUpdate = 0
 
       const { data, error: uploadError } = await supabase.storage
-        .from("videos")
+        .from("VIDEO")
         .upload(fileName, selectedFile, {
           onUploadProgress: (progress) => {
             const progressPercent = Math.round((progress.loaded / progress.total) * 100)
