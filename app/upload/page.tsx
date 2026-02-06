@@ -149,7 +149,7 @@ export default function UploadPage() {
 
         console.log("[v0] Saving video metadata to Supabase...")
         const { error: insertError } = await supabase.from("videos").insert({
-          user_id: user.uid,
+          user_id: user.id,
           title: formData.title,
           description: formData.description,
           video_url: videoUrl,
@@ -172,14 +172,14 @@ export default function UploadPage() {
         const { data: playerProfile } = await supabase
           .from("player_profiles")
           .select("video_count")
-          .eq("id", user.uid)
+          .eq("id", user.id)
           .single()
 
         if (playerProfile) {
           await supabase
             .from("player_profiles")
             .update({ video_count: (playerProfile.video_count || 0) + 1 })
-            .eq("id", user.uid)
+            .eq("id", user.id)
         }
 
         console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
