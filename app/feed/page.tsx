@@ -39,31 +39,43 @@ export default function FeedPage() {
       const app = getFirebaseApp()
       const { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } = await import("firebase/firestore")
       const db = getFirestore(app)
-      const profileDoc = await getDoc(doc(db, "profiles", userId))
-      if (profileDoc.exists()) {
-        setUserProfile({ id: profileDoc.id, ...profileDoc.data() })
-      }
 
-      const videosQuery = query(collection(db, "videos"), orderBy("created_at", "desc"), limit(20))
-      const videosSnapshot = await getDocs(videosQuery)
-
-      const videosData = await Promise.all(
-        videosSnapshot.docs.map(async (videoDoc) => {
-          const videoData: any = { id: videoDoc.id, ...videoDoc.data() }
-
-          // Fetch profile for each video
-          const profileDocRef = await getDoc(doc(db, "profiles", videoData.user_id))
-          if (profileDocRef.exists()) {
-            videoData.profiles = { id: profileDocRef.id, ...profileDocRef.data() }
-          }
-
-          return videoData
-        }),
+      // Add timeout to handle offline scenarios
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Firebase operation timed out. Please check your internet connection.")), 10000)
       )
 
-      setVideos(videosData)
+      try {
+        const profileDoc = await Promise.race([getDoc(doc(db, "profiles", userId)), timeoutPromise])
+        if (profileDoc.exists()) {
+          setUserProfile({ id: profileDoc.id, ...profileDoc.data() })
+        }
+
+        const videosQuery = query(collection(db, "videos"), orderBy("created_at", "desc"), limit(20))
+        const videosSnapshot = await Promise.race([getDocs(videosQuery), timeoutPromise])
+
+        const videosData = await Promise.all(
+          videosSnapshot.docs.map(async (videoDoc) => {
+            const videoData: any = { id: videoDoc.id, ...videoDoc.data() }
+
+            // Fetch profile for each video
+            const profileDocRef = await getDoc(doc(db, "profiles", videoData.user_id))
+            if (profileDocRef.exists()) {
+              videoData.profiles = { id: profileDocRef.id, ...profileDocRef.data() }
+            }
+
+            return videoData
+          }),
+        )
+
+        setVideos(videosData)
+      } catch (timeoutError) {
+        console.warn("Network timeout - data may be loaded from offline cache", timeoutError)
+      }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
+      // Show empty state instead of crashing
+      setVideos([])
     } finally {
       setIsLoading(false)
     }
