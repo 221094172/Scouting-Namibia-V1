@@ -91,5 +91,5 @@ export default function FeedPage() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
-  return <FeedClient videos={videos} userProfile={userProfile} userId={user?.uid || ""} />
+  return <FeedClient videos={videos} userProfile={userProfile} userId={user?.id || ""} />
 }
