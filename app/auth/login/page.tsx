@@ -39,6 +39,8 @@ export default function LoginPage() {
       const user = userCredential.user
 
       if (!user.emailVerified) {
+        // Sign out unverified user to avoid leaving them in a partial logged-in state
+        await auth.signOut()
         setError(
           "Please verify your email address before logging in. Check your inbox for the verification link, or click 'Resend confirmation' below.",
         )
