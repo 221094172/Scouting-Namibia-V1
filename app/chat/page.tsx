@@ -43,6 +43,59 @@ export default function ChatPage() {
     return () => { if (unsubscribe) unsubscribe() }
   }, [router, userParam])
 
+  const handleStartConversation = async (currentUserId: string, otherUserId: string) => {
+    try {
+      const app = getFirebaseApp()
+      const { getFirestore, collection, query, where, getDocs, doc, setDoc, or } = await import("firebase/firestore")
+      const db = getFirestore(app)
+
+      // Check if conversation already exists between these two users
+      const conversationsQuery = query(
+        collection(db, "chat_conversations"),
+        or(
+          where("participant_1_id", "==", currentUserId),
+          where("participant_2_id", "==", currentUserId)
+        )
+      )
+
+      const snapshot = await getDocs(conversationsQuery)
+
+      // Find existing conversation between the two users
+      let existingConversationId = null
+      for (const doc of snapshot.docs) {
+        const convData = doc.data()
+        if (
+          (convData.participant_1_id === currentUserId && convData.participant_2_id === otherUserId) ||
+          (convData.participant_1_id === otherUserId && convData.participant_2_id === currentUserId)
+        ) {
+          existingConversationId = doc.id
+          break
+        }
+      }
+
+      if (existingConversationId) {
+        // Conversation exists, navigate to it
+        router.push(`/chat/${existingConversationId}`)
+      } else {
+        // Create new conversation
+        const newConvRef = await addDoc(collection(db, "chat_conversations"), {
+          participant_1_id: currentUserId,
+          participant_2_id: otherUserId,
+          created_at: new Date(),
+          last_message_at: new Date(),
+          last_message_text: "",
+        })
+
+        // Navigate to new conversation
+        router.push(`/chat/${newConvRef.id}`)
+      }
+    } catch (error) {
+      console.error("[v0] Error starting conversation:", error)
+      // Fallback to showing conversations list
+      await loadConversations(currentUserId)
+    }
+  }
+
   const loadConversations = async (userId: string) => {
     try {
       const app = getFirebaseApp()
