@@ -33,6 +33,8 @@ const NAMIBIA_REGIONS = [
 
 const POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward", "Striker", "Winger"]
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB in bytes
+
 export default function UploadPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -45,6 +47,7 @@ export default function UploadPage() {
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
