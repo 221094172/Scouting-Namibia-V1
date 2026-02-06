@@ -155,7 +155,8 @@ function RegisterForm() {
       }
 
       console.log("[v0] Registration successful, email verification sent")
-      router.push("/auth/sign-up-success")
+      // Show sign up success with email verification note
+      router.push(`/auth/sign-up-success?email=${encodeURIComponent(formData.email)}`)
     } catch (error: any) {
       console.error("[v0] Registration error:", error)
       setError(error.message || "An error occurred during registration")
