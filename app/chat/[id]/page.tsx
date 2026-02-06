@@ -200,7 +200,7 @@ export default function ChatPage() {
         read: false,
       }
 
-      setMessages([...messages, newMessageObj])
+      setMessages((prev) => [...prev, newMessageObj])
       setNewMessage("")
     } catch (err) {
       console.error("[v0] Message error:", err)
