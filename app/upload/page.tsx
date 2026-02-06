@@ -102,8 +102,8 @@ export default function UploadPage() {
       // Use uploadBytesResumable for better control and progress tracking
       const uploadTask = uploadBytesResumable(storageRef, selectedFile)
 
-      return new Promise((resolve, reject) => {
-        let lastProgressTime = Date.now()
+      // Wrap uploadTask in a Promise and await it
+      await new Promise<void>((resolve, reject) => {
         let uploadStartTime = Date.now()
 
         uploadTask.on(
@@ -117,9 +117,6 @@ export default function UploadPage() {
             setUploadProgress(Math.round(progress))
 
             console.log(`[v0] Upload progress: ${Math.round(progress)}% (${(snapshot.bytesTransferred / (1024 * 1024)).toFixed(1)}MB / ${(snapshot.totalBytes / (1024 * 1024)).toFixed(1)}MB) - ${elapsedSeconds.toFixed(1)}s elapsed`)
-
-            // Update last activity time
-            lastProgressTime = currentTime
           },
           (error) => {
             // Handle errors with more detail
@@ -171,9 +168,10 @@ export default function UploadPage() {
               })
 
               console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
+              setIsLoading(false)
               router.push("/feed")
               router.refresh()
-              resolve(null)
+              resolve()
             } catch (error: any) {
               console.error("[v0] Metadata error:", error)
               setError("Video uploaded but failed to save metadata. Please try again.")
