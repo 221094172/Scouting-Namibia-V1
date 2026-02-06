@@ -22,7 +22,7 @@ import {
   Trophy,
   Search,
 } from "lucide-react"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 const NAMIBIA_REGIONS = [
   "All Regions",
