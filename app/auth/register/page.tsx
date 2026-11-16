@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Trophy } from "lucide-react"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 const NAMIBIA_REGIONS = [
   "Erongo",
@@ -61,85 +61,102 @@ function RegisterForm() {
 
     try {
       console.log("[v0] Starting registration for:", formData.email)
-      
-      // Initialize Firebase App first, then dynamically import services
-      const app = getFirebaseApp()
-      
-      // Dynamic imports to ensure app is initialized first
-      const { getAuth, createUserWithEmailAndPassword, sendEmailVerification, updateProfile } = await import("firebase/auth")
-      const { getFirestore, doc, setDoc, serverTimestamp } = await import("firebase/firestore")
-      
-      const auth = getAuth(app)
-      const db = getFirestore(app)
 
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password)
-      const user = userCredential.user
-
-      // Update display name
-      await updateProfile(user, {
-        displayName: formData.name,
+      // Sign up with Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
       })
 
-      await setDoc(doc(db, "profiles", user.uid), {
-        id: user.uid,
+      if (signUpError) {
+        throw signUpError
+      }
+
+      if (!authData.user) {
+        throw new Error("User creation failed")
+      }
+
+      const userId = authData.user.id
+
+      // Create profile in profiles table
+      const { error: profileError } = await supabase.from("profiles").insert({
+        id: userId,
         email: formData.email,
         display_name: formData.name,
         role: role,
-        region: formData.region,
-        town: formData.town,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-        video_count: 0,
-        followers_count: 0,
-        following_count: 0,
+        region: formData.region || null,
+        town: formData.town || null,
+        bio: null,
+        phone_number: null,
+        profile_image_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       })
 
-      if (role === "player") {
-        await setDoc(doc(db, "player_profiles", user.uid), {
-          id: user.uid,
-          age: Number.parseInt(formData.age) || null,
-          gender: formData.gender || null,
-          position: formData.position || null,
-          height: null,
-          weight: null,
-          current_club: null,
-          achievements: null,
-          skills: null,
-          endorsements_count: 0,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        })
-      } else if (role === "coach") {
-        await setDoc(doc(db, "coach_profiles", user.uid), {
-          id: user.uid,
-          club_name: formData.clubName || null,
-          experience_level: formData.experience || null,
-          specialization: null,
-          certifications: null,
-          bio: null,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        })
-      } else if (role === "club") {
-        await setDoc(doc(db, "club_profiles", user.uid), {
-          id: user.uid,
-          club_name: formData.name,
-          league: null,
-          founded_year: null,
-          stadium: null,
-          contact_info: formData.contactInfo || null,
-          website: null,
-          description: null,
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp(),
-        })
+      if (profileError) {
+        throw profileError
       }
 
-      // Send verification email
-      await sendEmailVerification(user)
+      // Create role-specific profile
+      if (role === "player") {
+        const { error: playerError } = await supabase.from("player_profiles").insert({
+          id: userId,
+          age: formData.age ? parseInt(formData.age, 10) : null,
+          position: formData.position || null,
+          preferred_foot: null,
+          height_cm: null,
+          weight_kg: null,
+          experience_years: null,
+          current_club: null,
+          achievements: null,
+          video_count: 0,
+          profile_views: 0,
+          follower_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (playerError) {
+          throw playerError
+        }
+      } else if (role === "coach") {
+        const { error: coachError } = await supabase.from("coach_profiles").insert({
+          id: userId,
+          coaching_license: null,
+          years_experience: null,
+          specialization: null,
+          current_club: formData.clubName || null,
+          verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (coachError) {
+          throw coachError
+        }
+      } else if (role === "club") {
+        const { error: clubError } = await supabase.from("club_profiles").insert({
+          id: userId,
+          club_name: formData.name,
+          founded_year: null,
+          league: null,
+          category: null,
+          stadium: null,
+          contact_person: formData.contactInfo || null,
+          logo_url: null,
+          verified: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (clubError) {
+          throw clubError
+        }
+      }
 
       console.log("[v0] Registration successful, email verification sent")
-      router.push("/auth/sign-up-success")
+      // Show sign up success with email verification note
+      router.push(`/auth/sign-up-success?email=${encodeURIComponent(formData.email)}`)
     } catch (error: any) {
       console.error("[v0] Registration error:", error)
       setError(error.message || "An error occurred during registration")

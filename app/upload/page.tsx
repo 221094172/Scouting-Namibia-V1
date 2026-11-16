@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Upload, Video } from "lucide-react"
 import Link from "next/link"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 const NAMIBIA_REGIONS = [
   "Erongo",
@@ -33,6 +33,8 @@ const NAMIBIA_REGIONS = [
 
 const POSITIONS = ["Goalkeeper", "Defender", "Midfielder", "Forward", "Striker", "Winger"]
 
+const MAX_FILE_SIZE = 100 * 1024 * 1024 // 100MB in bytes
+
 export default function UploadPage() {
   const router = useRouter()
   const [user, setUser] = useState<any>(null)
@@ -45,26 +47,34 @@ export default function UploadPage() {
   })
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined
-    
-    const initAuth = async () => {
-      const app = getFirebaseApp()
-      const { getAuth, onAuthStateChanged } = await import("firebase/auth")
-      const auth = getAuth(app)
-      unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-        if (!currentUser) {
-          router.push("/auth/login")
-        } else {
-          setUser(currentUser)
-        }
-      })
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+      }
     }
-    
-    initAuth()
-    return () => { if (unsubscribe) unsubscribe() }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+      }
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -80,50 +90,133 @@ export default function UploadPage() {
     }
 
     setIsLoading(true)
+    setUploadProgress(0)
     setError(null)
 
     try {
-      const app = getFirebaseApp()
-      const { getStorage, ref, uploadBytes, getDownloadURL } = await import("firebase/storage")
-      const { getFirestore, collection, addDoc, serverTimestamp } = await import("firebase/firestore")
-      const storage = getStorage(app)
-      const db = getFirestore(app)
-      
       const fileExt = selectedFile.name.split(".").pop()
-      const fileName = `videos/${user.uid}/${Date.now()}.${fileExt}`
-      const storageRef = ref(storage, fileName)
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
 
-      await uploadBytes(storageRef, selectedFile)
-      const videoUrl = await getDownloadURL(storageRef)
+      console.log("[v0] Starting upload for file:", selectedFile.name, "Size:", selectedFile.size, "bytes")
 
-      await addDoc(collection(db, "videos"), {
-        user_id: user.uid,
-        title: formData.title,
-        description: formData.description,
-        video_url: videoUrl,
-        position: formData.position || null,
-        region: formData.region || null,
-        town: formData.town || null,
-        like_count: 0,
-        comment_count: 0,
-        view_count: 0,
-        created_at: serverTimestamp(),
-        updated_at: serverTimestamp(),
-      })
+      // Upload to Supabase Storage
+      let uploadStartTime = Date.now()
+      let lastProgressUpdate = 0
 
-      router.push("/feed")
-      router.refresh()
+      const { data, error: uploadError } = await supabase.storage
+        .from("Video")
+        .upload(fileName, selectedFile, {
+          onUploadProgress: (progress) => {
+            const progressPercent = Math.round((progress.loaded / progress.total) * 100)
+
+            // Only update state once per second to avoid excessive re-renders
+            const now = Date.now()
+            if (now - lastProgressUpdate >= 1000 || progressPercent === 100) {
+              setUploadProgress(progressPercent)
+              lastProgressUpdate = now
+
+              const elapsedSeconds = (now - uploadStartTime) / 1000
+              const mbTransferred = (progress.loaded / (1024 * 1024)).toFixed(1)
+              const mbTotal = (progress.total / (1024 * 1024)).toFixed(1)
+              console.log(`[v0] Upload progress: ${progressPercent}% (${mbTransferred}MB / ${mbTotal}MB) - ${elapsedSeconds.toFixed(1)}s elapsed`)
+            }
+          },
+        })
+
+      if (uploadError) {
+        console.error("[v0] Upload error:", uploadError)
+        let errorMessage = "Failed to upload video"
+
+        if (uploadError.message.includes("unauthorized")) {
+          errorMessage = "Not authorized to upload. Check Supabase Storage permissions."
+        } else if (uploadError.message.includes("not found")) {
+          errorMessage = "Storage bucket not found. Please check bucket configuration."
+        }
+
+        setError(errorMessage)
+        setIsLoading(false)
+        return
+      }
+
+      const uploadTime = (Date.now() - uploadStartTime) / 1000
+      console.log(`[v0] Upload completed successfully in ${uploadTime.toFixed(1)}s`)
+
+      try {
+        console.log("[v0] Getting download URL...")
+        const { data: urlData } = supabase.storage.from("Video").getPublicUrl(fileName)
+        const videoUrl = urlData?.publicUrl
+        console.log("[v0] Download URL obtained:", videoUrl.substring(0, 50) + "...")
+
+        console.log("[v0] Saving video metadata to Supabase...")
+        const { error: insertError } = await supabase.from("videos").insert({
+          user_id: user.id,
+          title: formData.title,
+          description: formData.description,
+          video_url: videoUrl,
+          position: formData.position || null,
+          region: formData.region || null,
+          town: formData.town || null,
+          like_count: 0,
+          comment_count: 0,
+          view_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+
+        if (insertError) {
+          throw insertError
+        }
+
+        // Increment video_count for user profile
+        console.log("[v0] Updating user video count...")
+        const { data: playerProfile } = await supabase
+          .from("player_profiles")
+          .select("video_count")
+          .eq("id", user.id)
+          .single()
+
+        if (playerProfile) {
+          await supabase
+            .from("player_profiles")
+            .update({ video_count: (playerProfile.video_count || 0) + 1 })
+            .eq("id", user.id)
+        }
+
+        console.log("[v0] Video metadata saved successfully. Redirecting to feed...")
+        setIsLoading(false)
+        router.push("/feed")
+        router.refresh()
+      } catch (error: any) {
+        console.error("[v0] Metadata error:", error)
+        setError("Video uploaded but failed to save metadata. Please try again.")
+        setIsLoading(false)
+      }
     } catch (error: any) {
       console.error("[v0] Upload error:", error)
       setError(error.message || "Failed to upload video")
-    } finally {
       setIsLoading(false)
     }
   }
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        const sizeMB = (file.size / (1024 * 1024)).toFixed(1)
+        setError(`File size (${sizeMB}MB) exceeds 100MB limit. Please compress your video.`)
+        return
+      }
+
+      // Validate file type
+      if (!file.type.startsWith("video/")) {
+        setError("Please select a valid video file")
+        return
+      }
+
+      setError(null)
+      setSelectedFile(file)
     }
   }
 
@@ -160,7 +253,13 @@ export default function UploadPage() {
                     <div className="space-y-2">
                       <Video className="mx-auto h-12 w-12 text-primary" />
                       <p className="text-sm font-medium text-foreground">{selectedFile.name}</p>
-                      <Button type="button" variant="outline" size="sm" onClick={() => setSelectedFile(null)}>
+                      <p className="text-xs text-muted-foreground">
+                        {(selectedFile.size / (1024 * 1024)).toFixed(1)}MB
+                      </p>
+                      <Button type="button" variant="outline" size="sm" onClick={() => {
+                        setSelectedFile(null)
+                        setUploadProgress(0)
+                      }}>
                         Change Video
                       </Button>
                     </div>
@@ -168,7 +267,8 @@ export default function UploadPage() {
                     <>
                       <Upload className="mx-auto h-12 w-12 text-muted-foreground" />
                       <p className="mt-2 text-sm text-muted-foreground">Click to upload or drag and drop</p>
-                      <p className="text-xs text-muted-foreground">MP4, MOV (max 100MB)</p>
+                      <p className="text-xs text-muted-foreground">MP4, MOV, WebM (max 100MB)</p>
+                      <p className="text-xs text-muted-foreground mt-1">Tip: Compress videos larger than 50MB for faster uploads</p>
                       <Input type="file" accept="video/*" onChange={handleFileChange} className="mt-4" />
                     </>
                   )}
@@ -244,10 +344,32 @@ export default function UploadPage() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && (
+                <div className="space-y-2">
+                  <p className="text-sm text-red-500">{error}</p>
+                  {error.includes("CORS") && (
+                    <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                      This is a backend configuration issue. Contact the administrator to configure Firebase Storage CORS settings.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {isLoading && (
+                <div className="space-y-2">
+                  <div className="w-full bg-secondary rounded-full h-2 overflow-hidden">
+                    <div
+                      className="bg-primary h-full transition-all duration-300"
+                      style={{ width: `${uploadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">{uploadProgress}% uploaded</p>
+                  <p className="text-xs text-muted-foreground text-center">Check browser console (F12) for detailed upload progress</p>
+                </div>
+              )}
 
               <Button type="submit" className="w-full" size="lg" disabled={!selectedFile || isLoading}>
-                {isLoading ? "Uploading..." : "Post Video"}
+                {isLoading ? `Uploading... ${uploadProgress > 0 ? `${uploadProgress}%` : ''}` : "Post Video"}
               </Button>
             </form>
           </CardContent>
