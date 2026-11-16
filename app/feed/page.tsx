@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 import FeedClient from "@/components/feed-client"
 
 export default function FeedPage() {
@@ -13,57 +13,75 @@ export default function FeedPage() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    let unsubscribe: (() => void) | undefined
-    
-    const initAuth = async () => {
-      const app = getFirebaseApp()
-      const { getAuth, onAuthStateChanged } = await import("firebase/auth")
-      const auth = getAuth(app)
-      unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-        if (!currentUser) {
-          router.push("/auth/login")
-        } else {
-          setUser(currentUser)
-          await loadData(currentUser.uid)
-        }
-      })
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+        await loadData(session.user.id)
+      }
     }
-    
-    initAuth()
-    
-    return () => { if (unsubscribe) unsubscribe() }
+
+    checkAuth()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        router.push("/auth/login")
+      } else {
+        setUser(session.user)
+        await loadData(session.user.id)
+      }
+    })
+
+    return () => {
+      subscription?.unsubscribe()
+    }
   }, [router])
 
   const loadData = async (userId: string) => {
     try {
-      const app = getFirebaseApp()
-      const { getFirestore, collection, query, orderBy, limit, getDocs, doc, getDoc } = await import("firebase/firestore")
-      const db = getFirestore(app)
-      const profileDoc = await getDoc(doc(db, "profiles", userId))
-      if (profileDoc.exists()) {
-        setUserProfile({ id: profileDoc.id, ...profileDoc.data() })
+      // Fetch user profile
+      const { data: profileData, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .single()
+
+      if (profileError) {
+        console.warn("Profile fetch error:", profileError)
+      } else {
+        setUserProfile(profileData)
       }
 
-      const videosQuery = query(collection(db, "videos"), orderBy("created_at", "desc"), limit(20))
-      const videosSnapshot = await getDocs(videosQuery)
+      // Fetch videos with related profile data
+      const { data: videosData, error: videosError } = await supabase
+        .from("videos")
+        .select(
+          `*,
+          profiles (
+            id,
+            display_name,
+            profile_image_url,
+            bio,
+            region,
+            town
+          )`
+        )
+        .order("created_at", { ascending: false })
+        .limit(20)
 
-      const videosData = await Promise.all(
-        videosSnapshot.docs.map(async (videoDoc) => {
-          const videoData: any = { id: videoDoc.id, ...videoDoc.data() }
-
-          // Fetch profile for each video
-          const profileDocRef = await getDoc(doc(db, "profiles", videoData.user_id))
-          if (profileDocRef.exists()) {
-            videoData.profiles = { id: profileDocRef.id, ...profileDocRef.data() }
-          }
-
-          return videoData
-        }),
-      )
-
-      setVideos(videosData)
+      if (videosError) {
+        console.error("[v0] Error loading videos:", videosError)
+        setVideos([])
+      } else {
+        setVideos(videosData || [])
+      }
     } catch (error) {
       console.error("[v0] Error loading data:", error)
+      setVideos([])
     } finally {
       setIsLoading(false)
     }
@@ -73,5 +91,5 @@ export default function FeedPage() {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
 
-  return <FeedClient videos={videos} userProfile={userProfile} userId={user?.uid || ""} />
+  return <FeedClient videos={videos} userProfile={userProfile} userId={user?.id || ""} />
 }

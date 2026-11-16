@@ -121,6 +121,94 @@ export default function ProfileDetailPage({
     }
   }
 
+  const handleFollow = async () => {
+    try {
+      const app = getFirebaseApp()
+      const { getFirestore, collection, addDoc, deleteDoc, query, where, getDocs, doc, updateDoc, increment } =
+        await import("firebase/firestore")
+      const db = getFirestore(app)
+
+      if (isFollowing) {
+        // Unfollow
+        const followQuery = query(
+          collection(db, "follows"),
+          where("follower_id", "==", user.uid),
+          where("following_id", "==", profileId)
+        )
+        const followSnapshot = await getDocs(followQuery)
+
+        for (const followDoc of followSnapshot.docs) {
+          await deleteDoc(followDoc.ref)
+        }
+
+        // Decrement follower count for creator and following count for current user
+        await updateDoc(doc(db, "profiles", profileId), {
+          followers_count: increment(-1),
+        })
+        await updateDoc(doc(db, "profiles", user.uid), {
+          following_count: increment(-1),
+        })
+
+        setIsFollowing(false)
+      } else {
+        // Follow
+        await addDoc(collection(db, "follows"), {
+          follower_id: user.uid,
+          following_id: profileId,
+          created_at: new Date(),
+        })
+
+        // Increment follower count for creator and following count for current user
+        await updateDoc(doc(db, "profiles", profileId), {
+          followers_count: increment(1),
+        })
+        await updateDoc(doc(db, "profiles", user.uid), {
+          following_count: increment(1),
+        })
+
+        setIsFollowing(true)
+      }
+    } catch (err) {
+      console.error("[v0] Follow error:", err)
+    }
+  }
+
+  const handleSavePlayer = async () => {
+    try {
+      const app = getFirebaseApp()
+      const { getFirestore, collection, addDoc, deleteDoc, query, where, getDocs, doc } =
+        await import("firebase/firestore")
+      const db = getFirestore(app)
+
+      if (savedPlayer) {
+        // Unsave player
+        const saveQuery = query(
+          collection(db, "saved_players"),
+          where("user_id", "==", user.uid),
+          where("player_id", "==", profileId)
+        )
+        const saveSnapshot = await getDocs(saveQuery)
+
+        for (const saveDoc of saveSnapshot.docs) {
+          await deleteDoc(saveDoc.ref)
+        }
+
+        setSavedPlayer(null)
+      } else {
+        // Save player
+        await addDoc(collection(db, "saved_players"), {
+          user_id: user.uid,
+          player_id: profileId,
+          created_at: new Date(),
+        })
+
+        setSavedPlayer(true)
+      }
+    } catch (err) {
+      console.error("[v0] Save player error:", err)
+    }
+  }
+
   if (isLoading || !profile) {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>
   }
@@ -250,12 +338,12 @@ export default function ProfileDetailPage({
                             </Link>
                           </Button>
                           {profile.role === "player" && (
-                            <Button variant="outline">
+                            <Button variant="outline" onClick={handleSavePlayer}>
                               <Bookmark className={`h-4 w-4 mr-2 ${savedPlayer ? "fill-current" : ""}`} />
                               {savedPlayer ? "Saved" : "Save"}
                             </Button>
                           )}
-                          <Button variant="outline">
+                          <Button variant="outline" onClick={handleFollow}>
                             <Users className={`h-4 w-4 mr-2 ${isFollowing ? "fill-current" : ""}`} />
                             {isFollowing ? "Following" : "Follow"}
                           </Button>

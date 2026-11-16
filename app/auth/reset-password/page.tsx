@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Trophy } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Trophy, CheckCircle } from "lucide-react"
 import { getFirebaseApp } from "@/lib/firebase/config"
 
 export default function ResetPasswordPage() {
@@ -17,6 +18,7 @@ export default function ResetPasswordPage() {
   const [confirmPassword, setConfirmPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,8 +44,11 @@ export default function ResetPasswordPage() {
       const auth = getAuth(app)
       await confirmPasswordReset(auth, oobCode, password)
 
-      alert("Password updated successfully!")
-      router.push("/auth/login")
+      setSuccess(true)
+      // Redirect after showing success message
+      setTimeout(() => {
+        router.push("/auth/login")
+      }, 2000)
     } catch (error: any) {
       console.error("[v0] Password update error:", error)
       setError(error.message || "Failed to update password")
@@ -88,8 +93,22 @@ export default function ResetPasswordPage() {
                 minLength={6}
               />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+            {success && (
+              <Alert className="border-green-500 bg-green-50 text-green-900">
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription className="text-sm">
+                  Password updated successfully! Redirecting to login...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm">{error}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button type="submit" className="w-full" size="lg" disabled={isLoading || success}>
               {isLoading ? "Updating..." : "Update Password"}
             </Button>
           </form>
