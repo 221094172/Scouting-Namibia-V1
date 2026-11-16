@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Trophy, Mail } from "lucide-react"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -29,19 +29,19 @@ export default function LoginPage() {
 
     try {
       console.log("[v0] Attempting login for:", email)
-      
-      // Initialize Firebase App first, then dynamically import auth
-      const app = getFirebaseApp()
-      const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth")
-      const auth = getAuth(app)
 
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const user = userCredential.user
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-      if (!user.emailVerified) {
-        setError(
-          "Please verify your email address before logging in. Check your inbox for the verification link, or click 'Resend confirmation' below.",
-        )
+      if (error) {
+        throw error
+      }
+
+      const user = data.user
+      if (!user) {
+        setError("Login failed. Please try again.")
         return
       }
 
@@ -50,10 +50,12 @@ export default function LoginPage() {
       router.refresh()
     } catch (error: any) {
       console.error("[v0] Login error:", error)
-      if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+      if (error.message?.includes("Invalid login credentials")) {
         setError("Invalid email or password. Please try again.")
-      } else if (error.code === "auth/user-not-found") {
-        setError("No account found with this email. Please sign up first.")
+      } else if (error.message?.includes("Email not confirmed")) {
+        setError(
+          "Please verify your email address before logging in. Check your inbox for the verification link, or click 'Resend confirmation' below.",
+        )
       } else {
         setError(error.message || "An error occurred during login")
       }
@@ -63,8 +65,8 @@ export default function LoginPage() {
   }
 
   const handleResendConfirmation = async () => {
-    if (!email || !password) {
-      setError("Please enter your email and password first")
+    if (!email) {
+      setError("Please enter your email first")
       return
     }
 
@@ -73,11 +75,15 @@ export default function LoginPage() {
     setResendSuccess(false)
 
     try {
-      const app = getFirebaseApp()
-      const { getAuth, signInWithEmailAndPassword, sendEmailVerification } = await import("firebase/auth")
-      const auth = getAuth(app)
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      await sendEmailVerification(userCredential.user)
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+      })
+
+      if (error) {
+        throw error
+      }
+
       setResendSuccess(true)
     } catch (error: any) {
       console.error("[v0] Resend confirmation error:", error)
@@ -98,11 +104,15 @@ export default function LoginPage() {
     setResendSuccess(false)
 
     try {
-      const app = getFirebaseApp()
-      const { getAuth, sendPasswordResetEmail } = await import("firebase/auth")
-      const auth = getAuth(app)
-      await sendPasswordResetEmail(auth, email)
-      alert("Password reset email sent! Please check your inbox.")
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+
+      if (error) {
+        throw error
+      }
+
+      setResendSuccess(true)
     } catch (error: any) {
       console.error("[v0] Password reset error:", error)
       setError(error.message || "Failed to send reset email")
@@ -157,7 +167,7 @@ export default function LoginPage() {
               <Alert className="border-green-500 bg-green-50 text-green-900">
                 <Mail className="h-4 w-4" />
                 <AlertDescription className="text-sm">
-                  Verification email resent! Please check your inbox and spam folder.
+                  Email sent! Please check your inbox and spam folder for the verification or password reset link.
                 </AlertDescription>
               </Alert>
             )}

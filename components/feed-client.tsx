@@ -22,7 +22,7 @@ import {
   Trophy,
   Search,
 } from "lucide-react"
-import { getFirebaseApp } from "@/lib/firebase/config"
+import { supabase } from "@/lib/supabase/client"
 
 const NAMIBIA_REGIONS = [
   "All Regions",
@@ -276,42 +276,53 @@ function VideoPost({ video, userId }: { video: any; userId: string }) {
 
 const handleLike = async () => {
   try {
-  const app = getFirebaseApp()
-  const { getFirestore, doc, updateDoc, increment, addDoc, collection, deleteDoc, query, where, getDocs } = await import("firebase/firestore")
-  const db = getFirestore(app)
-      if (liked) {
-        const likesQuery = query(
-          collection(db, "video_likes"),
-          where("video_id", "==", video.id),
-          where("user_id", "==", userId),
-        )
-        const snapshot = await getDocs(likesQuery)
-        snapshot.forEach(async (docSnapshot) => {
-          await deleteDoc(docSnapshot.ref)
-        })
+    if (liked) {
+      // Unlike
+      const { error } = await supabase
+        .from("video_likes")
+        .delete()
+        .eq("video_id", video.id)
+        .eq("user_id", userId)
 
-        await updateDoc(doc(db, "videos", video.id), {
-          like_count: increment(-1),
-        })
-        setLiked(false)
-        setLikeCount(likeCount - 1)
-      } else {
-        await addDoc(collection(db, "video_likes"), {
+      if (error) throw error
+
+      // Update video like count
+      const { error: updateError } = await supabase
+        .from("videos")
+        .update({ like_count: Math.max(0, likeCount - 1) })
+        .eq("id", video.id)
+
+      if (updateError) throw updateError
+
+      setLiked(false)
+      setLikeCount((prev) => prev - 1)
+    } else {
+      // Like
+      const { error } = await supabase
+        .from("video_likes")
+        .insert({
           video_id: video.id,
           user_id: userId,
-          created_at: new Date(),
+          created_at: new Date().toISOString(),
         })
 
-        await updateDoc(doc(db, "videos", video.id), {
-          like_count: increment(1),
-        })
-        setLiked(true)
-        setLikeCount(likeCount + 1)
-      }
-    } catch (error) {
-      console.error("[v0] Error toggling like:", error)
+      if (error) throw error
+
+      // Update video like count
+      const { error: updateError } = await supabase
+        .from("videos")
+        .update({ like_count: likeCount + 1 })
+        .eq("id", video.id)
+
+      if (updateError) throw updateError
+
+      setLiked(true)
+      setLikeCount((prev) => prev + 1)
     }
+  } catch (error) {
+    console.error("[v0] Error toggling like:", error)
   }
+}
 
   const profile = video.profiles
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Card, CardContent } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -11,13 +11,15 @@ import { getFirebaseApp } from "@/lib/firebase/config"
 
 export default function ChatPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const userParam = searchParams.get("user") // Get user param to start conversation
   const [user, setUser] = useState<any>(null)
   const [conversations, setConversations] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined
-    
+
     const initAuth = async () => {
       const app = getFirebaseApp()
       const { getAuth, onAuthStateChanged } = await import("firebase/auth")
@@ -27,14 +29,72 @@ export default function ChatPage() {
           router.push("/auth/login")
         } else {
           setUser(currentUser)
-          await loadConversations(currentUser.uid)
+          // If user param is provided, try to start or find conversation with that user
+          if (userParam) {
+            await handleStartConversation(currentUser.uid, userParam)
+          } else {
+            await loadConversations(currentUser.uid)
+          }
         }
       })
     }
-    
+
     initAuth()
     return () => { if (unsubscribe) unsubscribe() }
-  }, [router])
+  }, [router, userParam])
+
+  const handleStartConversation = async (currentUserId: string, otherUserId: string) => {
+    try {
+      const app = getFirebaseApp()
+      const { getFirestore, collection, query, where, getDocs, doc, setDoc, or } = await import("firebase/firestore")
+      const db = getFirestore(app)
+
+      // Check if conversation already exists between these two users
+      const conversationsQuery = query(
+        collection(db, "chat_conversations"),
+        or(
+          where("participant_1_id", "==", currentUserId),
+          where("participant_2_id", "==", currentUserId)
+        )
+      )
+
+      const snapshot = await getDocs(conversationsQuery)
+
+      // Find existing conversation between the two users
+      let existingConversationId = null
+      for (const doc of snapshot.docs) {
+        const convData = doc.data()
+        if (
+          (convData.participant_1_id === currentUserId && convData.participant_2_id === otherUserId) ||
+          (convData.participant_1_id === otherUserId && convData.participant_2_id === currentUserId)
+        ) {
+          existingConversationId = doc.id
+          break
+        }
+      }
+
+      if (existingConversationId) {
+        // Conversation exists, navigate to it
+        router.push(`/chat/${existingConversationId}`)
+      } else {
+        // Create new conversation
+        const newConvRef = await addDoc(collection(db, "chat_conversations"), {
+          participant_1_id: currentUserId,
+          participant_2_id: otherUserId,
+          created_at: new Date(),
+          last_message_at: new Date(),
+          last_message_text: "",
+        })
+
+        // Navigate to new conversation
+        router.push(`/chat/${newConvRef.id}`)
+      }
+    } catch (error) {
+      console.error("[v0] Error starting conversation:", error)
+      // Fallback to showing conversations list
+      await loadConversations(currentUserId)
+    }
+  }
 
   const loadConversations = async (userId: string) => {
     try {
